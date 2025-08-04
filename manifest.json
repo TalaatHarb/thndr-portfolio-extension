@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Thndr Portfolio Breakdown",
+  "version": "1.0",
+  "description": "Displays portfolio breakdown by asset class",
+  "icons": {
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://web.thndr.app/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["storage"]
+}
