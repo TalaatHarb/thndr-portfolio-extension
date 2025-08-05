@@ -8,10 +8,25 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://web.thndr.app/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://web.thndr.app/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
-  "permissions": ["storage"]
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ]
 }

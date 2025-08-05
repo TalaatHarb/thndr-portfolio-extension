@@ -31,12 +31,15 @@
       totalValue += value;
     }
 
+    const percentages = [];
     console.log('%c[Thndr Portfolio Breakdown]', 'font-weight: bold; font-size: 16px');
     for (const [cls, val] of Object.entries(classTotals)) {
       const percentage = ((val / totalValue) * 100).toFixed(2);
-      console.log(`${cls}: ${percentage}%`);
+      const data = {};
+      data[cls] = percentage;
+      percentages.push(data);
     }
-
+    chrome.runtime.sendMessage({ action: 'storePortfolio', percentages });
   } catch (err) {
     console.error('[Thndr Extension] Unexpected error:', err);
   }
