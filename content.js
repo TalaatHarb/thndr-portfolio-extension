@@ -5,9 +5,11 @@
     return;
   }
 
-  await fetchPortfolioData(token);
-  await fetchPurchasePower(token);
-  await fetchCachInHolding(token);
+  await Promise.all([
+    () => fetchPortfolioData(token),
+    () => fetchPurchasePower(token),
+    () => fetchCachInHolding(token)
+  ]);
 
 })();
 

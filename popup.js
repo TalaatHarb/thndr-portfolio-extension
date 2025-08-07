@@ -6,11 +6,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function handlePortfolioData(result) {
-  const data = result.portfolioData;
   if (!result?.portfolioData) {
     document.getElementById('portfolio').innerText = 'No data available.';
     return;
   }
+  const data = result.portfolioData;
 
   const container = document.getElementById('portfolio');
   container.innerHTML = '';
@@ -35,13 +35,28 @@ function handlePortfolioData(result) {
 }
 
 function handlePortofolioValue(result) {
-  console.log(result.portfolioValue);
+  const portfolioValue = result.portfolioValue;
+  const container = document.getElementById('portfolio-value');
+  container.innerHTML = '';
+  const div = document.createElement('div');
+  div.innerHTML = `Portfolio Value: ${portfolioValue}`;
+  container.appendChild(div);
 }
 
 function handlePurchasePower(result) {
-  console.log(result.purchasePower);
+  const purchasePower = result.purchasePower;
+  const container = document.getElementById('purchase-power');
+  container.innerHTML = '';
+  const div = document.createElement('div');
+  div.innerHTML = `Purchase Power: ${purchasePower}`;
+  container.appendChild(div);
 }
 
 function handleCachInHolding(result) {
-  console.log(result.cachInHolding);
+  const cachInHolding = result.cachInHolding;
+  const container = document.getElementById('cach-in-holding');
+  container.innerHTML = '';
+  const div = document.createElement('div');
+  div.innerHTML = `Cash in Holding: ${cachInHolding}`;
+  container.appendChild(div);
 }
