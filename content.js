@@ -4,12 +4,10 @@
     console.log('[Thndr Extension] No auth-token found, exiting.');
     return;
   }
-
-  await Promise.all([
-    () => fetchPortfolioData(token),
-    () => fetchPurchasePower(token),
-    () => fetchCachInHolding(token)
-  ]);
+  
+  await fetchPortfolioData(token);
+  await fetchPurchasePower(token);
+  await fetchCachInHolding(token);
 
 })();
 
