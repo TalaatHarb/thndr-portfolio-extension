@@ -1,15 +1,23 @@
 (async function () {
   const token = JSON.parse(localStorage.getItem('auth-token') || '""');
   if (!token) {
-    console.log('[Thndr Extension] No auth-token found, exiting.');
+    console.warn('[Thndr Extension] No auth-token found, exiting.');
     return;
   }
-  
-  await fetchPortfolioData(token);
-  await fetchPurchasePower(token);
-  await fetchCachInHolding(token);
 
+  await updateData(token);
+  setInterval(() => updateData(token), 60_000);
 })();
+
+async function updateData(token) {
+  try {
+    await fetchPortfolioData(token);
+    await fetchPurchasePower(token);
+    await fetchCashInHolding(token);
+  } catch (err) {
+    console.error('[Thndr Extension] Error updating data:', err);
+  }
+};
 
 async function fetchPortfolioData(token) {
   try {
@@ -40,7 +48,6 @@ async function fetchPortfolioData(token) {
     }
 
     const percentages = [];
-    console.log('%c[Thndr Portfolio Breakdown]', 'font-weight: bold; font-size: 16px');
     for (const [cls, val] of Object.entries(classTotals)) {
       const percentage = ((val / totalValue) * 100).toFixed(2);
       const percentageData = {};
@@ -74,7 +81,7 @@ async function fetchPurchasePower(token) {
   }
 }
 
-async function fetchCachInHolding(token) {
+async function fetchCashInHolding(token) {
   try {
     const response = await fetch('https://prod.thndr.app/market-service/accounts/cash-in-holding?market=egypt', {
       headers: {

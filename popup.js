@@ -1,8 +1,26 @@
 document.addEventListener('DOMContentLoaded', () => {
   chrome.storage.local.get('portfolioData', handlePortfolioData);
-  chrome.storage.local.get('portfolioValue', handlePortofolioValue);
+  chrome.storage.local.get('portfolioValue', handlePortfolioValue);
   chrome.storage.local.get('purchasePower', handlePurchasePower);
-  chrome.storage.local.get('cachInHolding', handleCachInHolding);
+  chrome.storage.local.get('cachInHolding', handleCashInHolding);
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes.portfolioData) {
+      handlePortfolioData({ portfolioData: changes.portfolioData.newValue });
+    }
+
+    if (areaName === 'local' && changes.portfolioValue) {
+      handlePortfolioValue({ portfolioValue: changes.portfolioValue.newValue });
+    }
+
+    if (areaName === 'local' && changes.purchasePower) {
+      handlePurchasePower({ purchasePower: changes.purchasePower.newValue });
+    }
+
+    if (areaName === 'local' && changes.cachInHolding) {
+      handleCashInHolding({ cachInHolding: changes.cachInHolding.newValue });
+    }
+  });
 });
 
 function handlePortfolioData(result) {
@@ -34,29 +52,23 @@ function handlePortfolioData(result) {
   })
 }
 
-function handlePortofolioValue(result) {
+function handlePortfolioValue(result) {
   const portfolioValue = result.portfolioValue;
   const container = document.getElementById('portfolio-value');
   container.innerHTML = '';
-  const div = document.createElement('div');
-  div.innerHTML = `Portfolio Value: ${portfolioValue}`;
-  container.appendChild(div);
+  container.appendChild(labeledValue('Portfolio Value', portfolioValue));
 }
 
 function handlePurchasePower(result) {
   const purchasePower = result.purchasePower;
   const container = document.getElementById('purchase-power');
   container.innerHTML = '';
-  const div = document.createElement('div');
-  div.innerHTML = `Purchase Power: ${purchasePower}`;
-  container.appendChild(div);
+  container.appendChild(labeledValue('Purchase Power', purchasePower));
 }
 
-function handleCachInHolding(result) {
+function handleCashInHolding(result) {
   const cachInHolding = result.cachInHolding;
   const container = document.getElementById('cach-in-holding');
   container.innerHTML = '';
-  const div = document.createElement('div');
-  div.innerHTML = `Cash in Holding: ${cachInHolding}`;
-  container.appendChild(div);
+  container.appendChild(labeledValue('Cash in Holding', cachInHolding));
 }
