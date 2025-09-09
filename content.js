@@ -33,7 +33,7 @@ async function fetchPortfolioData(token) {
     }
 
     const data = await response.json();
-    const portfolio_value = data.portfolio_value || 0;
+    const portfolio_value = data.portfolio_value.toFixed(2) || 0;
     const positions = data.positions || [];
 
     const classTotals = {};

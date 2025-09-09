@@ -1,24 +1,57 @@
 document.addEventListener('DOMContentLoaded', () => {
-  chrome.storage.local.get('portfolioData', handlePortfolioData);
-  chrome.storage.local.get('portfolioValue', handlePortfolioValue);
-  chrome.storage.local.get('purchasePower', handlePurchasePower);
-  chrome.storage.local.get('cachInHolding', handleCashInHolding);
+  // Get all values at once
+  chrome.storage.local.get(
+    ['portfolioData', 'portfolioValue', 'purchasePower', 'cachInHolding'],
+    (result) => {
+      handlePortfolioData({ portfolioData: result.portfolioData });
+      handlePortfolioValue({ portfolioValue: result.portfolioValue });
+      handlePurchasePower({ purchasePower: result.purchasePower });
+      handleCashInHolding({ cachInHolding: result.cachInHolding });
 
+      // Calculate total money
+      const totalMoney =
+        (parseFloat(result.portfolioValue) || 0.0) +
+        (parseFloat(result.purchasePower) || 0.0) +
+        (parseFloat(result.cachInHolding) || 0.0);
+
+      // You could now pass this to a new visualization handler
+      handleTotalMoney(totalMoney.toFixed(2));
+    }
+  );
+
+  // Listen for changes
   chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local' && changes.portfolioData) {
-      handlePortfolioData({ portfolioData: changes.portfolioData.newValue });
-    }
+    if (areaName === 'local') {
+      // Check if any of the 3 values changed
+      if (changes.portfolioValue || changes.purchasePower || changes.cachInHolding) {
+        chrome.storage.local.get(
+          ['portfolioValue', 'purchasePower', 'cachInHolding'],
+          (result) => {
+            const totalMoney =
+              (parseFloat(result.portfolioValue) || 0) +
+              (parseFloat(result.purchasePower) || 0) +
+              (parseFloat(result.cachInHolding) || 0);
 
-    if (areaName === 'local' && changes.portfolioValue) {
-      handlePortfolioValue({ portfolioValue: changes.portfolioValue.newValue });
-    }
+            handleTotalMoney(totalMoney);
+          }
+        );
+      }
 
-    if (areaName === 'local' && changes.purchasePower) {
-      handlePurchasePower({ purchasePower: changes.purchasePower.newValue });
-    }
+      if (changes.portfolioData) {
+        handlePortfolioData({ portfolioData: changes.portfolioData.newValue });
+      }
 
-    if (areaName === 'local' && changes.cachInHolding) {
-      handleCashInHolding({ cachInHolding: changes.cachInHolding.newValue });
+      if (changes.portfolioValue) {
+        handlePortfolioValue({ portfolioValue: changes.portfolioValue.newValue });
+      }
+
+      if (changes.purchasePower) {
+        handlePurchasePower({ purchasePower: changes.purchasePower.newValue });
+      }
+
+      if (changes.cachInHolding) {
+        handleCashInHolding({ cachInHolding: changes.cachInHolding.newValue });
+      }
     }
   });
 });
@@ -71,4 +104,11 @@ function handleCashInHolding(result) {
   const container = document.getElementById('cach-in-holding');
   container.innerHTML = '';
   container.appendChild(labeledValue('Cash in Holding', cachInHolding));
+}
+
+function handleTotalMoney(result) {
+  const totalMoney = result;
+  const container = document.getElementById('total-money');
+  container.innerHTML = '';
+  container.appendChild(labeledValue(`Total Assets (${new Date().toLocaleTimeString()})`, totalMoney));
 }
