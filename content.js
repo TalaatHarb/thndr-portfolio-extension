@@ -6,7 +6,7 @@
   }
 
   await updateData(token);
-  setInterval(() => updateData(token), 60_000);
+  setInterval(() => updateData(token), 30_000);
 })();
 
 async function updateData(token) {
@@ -34,6 +34,8 @@ async function fetchPortfolioData(token) {
 
     const data = await response.json();
     const portfolio_value = data.portfolio_value.toFixed(2) || 0;
+    const total_return = data.total_return.toFixed(2) || 0;
+    const current_investment_total = portfolio_value - total_return;
     const positions = data.positions || [];
 
     const classTotals = {};
@@ -56,6 +58,7 @@ async function fetchPortfolioData(token) {
     }
     chrome.runtime.sendMessage({ action: 'storePortfolio', percentages });
     chrome.runtime.sendMessage({ action: 'storePortfolioValue', portfolio_value });
+    chrome.runtime.sendMessage({ action: 'storeCurrentInvestmentTotal', current_investment_total });
   } catch (err) {
     console.error('[Thndr Extension] Unexpected error:', err);
   }
