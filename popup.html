@@ -8,19 +8,39 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <h2>Portfolio Allocation</h2>
-  <div id="portfolio"></div>
-  <div id="portfolio-value"></div>
-  <div id="return-percentage-container">Return %: <span id="return-percentage">—</span></div>
-  <div id="purchase-power"></div>
-  <div id="cach-in-holding"></div>
-  <div id="total-money"></div>
+  <header class="header">
+    <h2>Portfolio</h2>
+  </header>
 
-  <div class="input-group">
-    <label for="investmentTotalInput">Total Investment:</label>
-    <input type="number" id="investmentTotalInput" placeholder="Enter total investment">
-    <button id="saveInvestmentTotalButton">Save</button>
-  </div>
+  <main class="content">
+    <section class="card">
+      <h3 class="section-title">Allocation</h3>
+      <div id="portfolio"></div>
+    </section>
+
+    <section class="card">
+      <h3 class="section-title">Summary</h3>
+      <div id="portfolio-value"></div>
+      <div id="return-percentage-container" class="kv kv-static">
+        <span class="kv-label">Return %</span>
+        <span id="return-percentage" class="kv-value">—</span>
+      </div>
+      <div id="purchase-power"></div>
+      <div id="cach-in-holding"></div>
+      <div id="total-money"></div>
+    </section>
+
+    <section class="card">
+      <h3 class="section-title">Settings</h3>
+      <div class="input-group">
+        <label for="investmentTotalInput">Total Investment</label>
+        <div class="input-row">
+          <input type="number" id="investmentTotalInput" placeholder="Enter total investment">
+          <button id="saveInvestmentTotalButton" type="button">Save</button>
+        </div>
+      </div>
+    </section>
+  </main>
 
   <script src="ui.js"></script>
   <script src="popup.js"></script>
