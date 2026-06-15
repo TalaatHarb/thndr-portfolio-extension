@@ -1,5 +1,6 @@
 (async function () {
   const token = JSON.parse(localStorage.getItem('auth-token') || '""');
+
   if (!token) {
     console.warn('[Thndr Extension] No auth-token found, exiting.');
     return;
@@ -11,28 +12,94 @@
 
 async function updateData(token) {
   try {
-    await fetchPortfolioData(token);
-    await fetchPurchasePower(token);
-    await fetchCashInHolding(token);
+    await Promise.all([
+      // Original calls
+      fetchPortfolioData(token),
+      fetchPurchasePower(token),
+      fetchCashInHolding(token),
+      fetchMarketHours(token),
+      fetchPositions(token),
+      fetchEligibilities(token),
+      fetchFundingEligibilities(token),
+      fetchSuspensionStatuses(token),
+
+      // Additional guess APIs/discovery calls
+      // fetchWithdrawable(token),
+      // fetchWalletAndPortfolio(token),
+      // fetchPositions(token),
+
+      // fetchUserInfo(token),
+
+      // fetchComplianceForms(token),
+      // fetchEligibilities(token),
+      // fetchFundingEligibilities(token),
+      // fetchSuspensionStatuses(token),
+
+      // fetchFundingRequests(token),
+      // fetchAccountActivities(token),
+      // fetchUserBankAccount(token),
+      // fetchFundingFees(token),
+      // fetchVFCashNumbers(token),
+
+      // fetchWatchlist(token),
+
+      // fetchMarketHours(token),
+
+      // fetchSubscriptions(token),
+      // fetchPlans(token),
+      // fetchSubscribers(token),
+      // fetchSubscriberPaymentMethod(token),
+    ]);
   } catch (err) {
     console.error('[Thndr Extension] Error updating data:', err);
   }
-};
+}
+
+/* ==========================================================================
+   Generic Helpers
+   ========================================================================== */
+
+async function thndrGet(token, path) {
+  const response = await fetch(`https://prod.thndr.app${path}`, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    console.error(
+      '[Thndr Extension] API error:',
+      response.status,
+      await response.text()
+    );
+    return null;
+  }
+
+  return response.json();
+}
+
+function sendStoreMessage(action, payloadKey, payload) {
+  chrome.runtime.sendMessage({
+    action,
+    [payloadKey]: payload
+  });
+}
+
+
+
+/* ==========================================================================
+   MARKET SERVICE
+   ========================================================================== */
 
 async function fetchPortfolioData(token) {
   try {
-    const response = await fetch('https://prod.thndr.app/market-service/accounts/portfolio-info?market=egypt', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    const data = await thndrGet(
+      token,
+      '/market-service/accounts/portfolio-info?market=egypt'
+    );
 
-    if (!response.ok) {
-      console.error('[Thndr Extension] API error:', response.status, await response.text());
-      return;
-    }
+    if (!data) return;
 
-    const data = await response.json();
     const portfolio_value = data.portfolio_value.toFixed(2) || 0;
     const total_return = data.total_return.toFixed(2) || 0;
     const current_investment_total = portfolio_value - total_return;
@@ -50,56 +117,439 @@ async function fetchPortfolioData(token) {
     }
 
     const percentages = [];
+
     for (const [cls, val] of Object.entries(classTotals)) {
       const percentage = ((val / totalValue) * 100).toFixed(2);
+
       const percentageData = {};
       percentageData[cls] = percentage;
+
       percentages.push(percentageData);
     }
-    chrome.runtime.sendMessage({ action: 'storePortfolio', percentages });
-    chrome.runtime.sendMessage({ action: 'storePortfolioValue', portfolio_value });
-    chrome.runtime.sendMessage({ action: 'storeCurrentInvestmentTotal', current_investment_total });
+
+    sendStoreMessage('storePortfolio', 'percentages', percentages);
+    sendStoreMessage('storePortfolioValue', 'portfolio_value', portfolio_value);
+    sendStoreMessage('storeCurrentInvestmentTotal', 'current_investment_total', current_investment_total);
   } catch (err) {
-    console.error('[Thndr Extension] Unexpected error:', err);
+    console.error('[Thndr Extension] Error in fetchPortfolioData:', err);
   }
 }
 
 async function fetchPurchasePower(token) {
   try {
-    const response = await fetch('https://prod.thndr.app/market-service/accounts/purchase-power?market=egypt', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    const data = await thndrGet(
+      token,
+      '/market-service/accounts/purchase-power?market=egypt'
+    );
 
-    if (!response.ok) {
-      console.error('[Thndr Extension] API error:', response.status, await response.text());
-      return;
-    }
+    if (!data) return;
 
-    const purchase_power = await response.json();
-    chrome.runtime.sendMessage({ action: 'storePurchasePower', purchase_power });
+    sendStoreMessage(
+      'storePurchasePower',
+      'purchase_power',
+      data
+    );
   } catch (err) {
-    console.error('[Thndr Extension] Unexpected error:', err);
+    console.error(err);
   }
 }
 
 async function fetchCashInHolding(token) {
   try {
-    const response = await fetch('https://prod.thndr.app/market-service/accounts/cash-in-holding?market=egypt', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    const data = await thndrGet(
+      token,
+      '/market-service/accounts/cash-in-holding?market=egypt'
+    );
 
-    if (!response.ok) {
-      console.error('[Thndr Extension] API error:', response.status, await response.text());
-      return;
-    }
+    if (!data) return;
 
-    const cach_in_holding = await response.json();
-    chrome.runtime.sendMessage({ action: 'storeCachInHolding', cach_in_holding });
+    sendStoreMessage(
+      'storeCachInHolding',
+      'cach_in_holding',
+      data
+    );
   } catch (err) {
-    console.error('[Thndr Extension] Unexpected error:', err);
+    console.error(err);
+  }
+}
+
+async function fetchWithdrawable(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/market-service/accounts/withdrawable?market=egypt'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeWithdrawable',
+      'withdrawable',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchWalletAndPortfolio(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/market-service/accounts/wallet-and-portfolio?market=egypt'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeWalletAndPortfolio',
+      'walletAndPortfolio',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchPositions(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/market-service/accounts/positions?market=egypt'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storePositions',
+      'positions',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchMarketHours(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/market-service/markets/hours'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeMarketHours',
+      'marketHours',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+/* ==========================================================================
+   AUTH SERVICE
+   ========================================================================== */
+
+async function fetchUserInfo(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/auth-service/v2/users/info'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeUserInfo',
+      'userInfo',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+/* ==========================================================================
+   COMPLIANCE SERVICE
+   ========================================================================== */
+
+async function fetchComplianceForms(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/compliance-service/account-forms'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeComplianceForms',
+      'accountForms',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchEligibilities(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/compliance-service/eligibilities'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeEligibilities',
+      'eligibilities',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchFundingEligibilities(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/compliance-service/funding-eligibilities'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeFundingEligibilities',
+      'fundingEligibilities',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchSuspensionStatuses(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/compliance-service/suspension-statuses'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeSuspensionStatuses',
+      'suspensionStatuses',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+/* ==========================================================================
+   FUNDING SERVICE
+   ========================================================================== */
+
+async function fetchFundingRequests(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/funding-service/funding-requests'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeFundingRequests',
+      'fundingRequests',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchAccountActivities(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/funding-service/account-activities'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeAccountActivities',
+      'accountActivities',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchUserBankAccount(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/funding-service/user-bank-account'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeUserBankAccount',
+      'userBankAccount',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchFundingFees(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/funding-service/fees'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeFundingFees',
+      'fundingFees',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchVFCashNumbers(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/funding-service/vf-cash-phone-numbers'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeVFCashNumbers',
+      'vfCashPhoneNumbers',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+/* ==========================================================================
+   ASSETS SERVICE
+   ========================================================================== */
+
+async function fetchWatchlist(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/assets-service/watchlist'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeWatchlist',
+      'watchlist',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+/* ==========================================================================
+   PAYMENT SERVICE
+   ========================================================================== */
+
+async function fetchSubscriptions(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/payment-service/v2/subscriptions?market=egypt'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeSubscriptions',
+      'subscriptions',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchPlans(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/payment-service/v2/plans?market=egypt'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storePlans',
+      'plans',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchSubscribers(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/payment-service/v2/subscribers'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeSubscribers',
+      'subscribers',
+      data
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function fetchSubscriberPaymentMethod(token) {
+  try {
+    const data = await thndrGet(
+      token,
+      '/payment-service/v2/subscribers/payment-method'
+    );
+
+    if (!data) return;
+
+    sendStoreMessage(
+      'storeSubscriberPaymentMethod',
+      'paymentMethod',
+      data
+    );
+  } catch (err) {
+    console.error(err);
   }
 }
