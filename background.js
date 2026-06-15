@@ -24,4 +24,24 @@ chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
     });
   }
 
+  if (message.action === 'storePositions') {
+    chrome.storage.local.set({ positions: message.positions }, () => {
+    });
+  }
+
+  if (message.action === 'storeEligibilities') {
+    chrome.storage.local.set({ eligibilities: message.eligibilities }, () => {
+    });
+  }
+
+  if (message.action === 'storeFundingEligibilities') {
+    chrome.storage.local.set({ fundingEligibilities: message.fundingEligibilities }, () => {
+    });
+  }
+
+  if (message.action === 'storeSuspensionStatuses') {
+    chrome.storage.local.set({ suspensionStatuses: message.suspensionStatuses }, () => {
+    });
+  }
+
 });

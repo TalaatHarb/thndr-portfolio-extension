@@ -1,7 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
   // Get all values at once
   chrome.storage.local.get(
-    ['portfolioData', 'portfolioValue', 'purchasePower', 'cachInHolding', 'currentInvestmentTotal', 'investmentTotal'],
+    [
+      'portfolioData',
+      'portfolioValue',
+      'purchasePower',
+      'cachInHolding',
+      'currentInvestmentTotal',
+      'investmentTotal',
+      'positions',
+      'eligibilities',
+      'fundingEligibilities',
+      'suspensionStatuses',
+    ],
     (result) => {
       // Calculate total money
       const totalMoney =
@@ -13,6 +24,12 @@ document.addEventListener('DOMContentLoaded', () => {
       handlePortfolioValue({ portfolioValue: result.portfolioValue, currentInvestmentTotal: result.currentInvestmentTotal || 0, investmentTotal: result.investmentTotal || 0, totalMoney: totalMoney });
       handlePurchasePower({ purchasePower: result.purchasePower });
       handleCashInHolding({ cachInHolding: result.cachInHolding });
+      handleTopPositions(result.positions);
+      handleAccountReadiness({
+        eligibilities: result.eligibilities,
+        fundingEligibilities: result.fundingEligibilities,
+        suspensionStatuses: result.suspensionStatuses,
+      });
 
       // You could now pass this to a new visualization handler
       handleTotalMoney(totalMoney.toFixed(2));
@@ -72,6 +89,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (changes.cachInHolding) {
         handleCashInHolding({ cachInHolding: changes.cachInHolding.newValue });
+      }
+
+      if (changes.positions) {
+        handleTopPositions(changes.positions.newValue);
+      }
+
+      if (
+        changes.eligibilities ||
+        changes.fundingEligibilities ||
+        changes.suspensionStatuses
+      ) {
+        chrome.storage.local.get(
+          ['eligibilities', 'fundingEligibilities', 'suspensionStatuses'],
+          (result) => {
+            handleAccountReadiness({
+              eligibilities: result.eligibilities,
+              fundingEligibilities: result.fundingEligibilities,
+              suspensionStatuses: result.suspensionStatuses,
+            });
+          }
+        );
       }
     }
   });
@@ -181,4 +219,236 @@ function handleTotalMoney(result) {
 
 function saveInvestmentTotal(investmentTotal) {
   chrome.storage.local.set({ investmentTotal: investmentTotal });
+}
+
+function handleTopPositions(positionsPayload) {
+  const listContainer = document.getElementById('top-positions');
+  const riskContainer = document.getElementById('concentration-risk');
+  listContainer.innerHTML = '';
+  riskContainer.innerHTML = '';
+
+  const positions = normalizePositions(positionsPayload);
+
+  if (!positions.length) {
+    listContainer.appendChild(labeledValue('Positions', 'No data available.'));
+    riskContainer.appendChild(labeledValue('Concentration', 'No data available.'));
+    return;
+  }
+
+  const totalValue = positions.reduce((sum, p) => sum + p.marketValue, 0);
+  const top3 = [...positions]
+    .sort((a, b) => b.marketValue - a.marketValue)
+    .slice(0, 3);
+
+  top3.forEach((position, index) => {
+    const pct = totalValue > 0 ? (position.marketValue * 100) / totalValue : 0;
+    listContainer.appendChild(
+      labeledValue(`#${index + 1} ${position.symbol}`, `${pct.toFixed(2)}%`)
+    );
+  });
+
+  const top1Pct = totalValue > 0 ? (top3[0].marketValue * 100) / totalValue : 0;
+  let concentrationState = 'green';
+  if (top1Pct >= 50) {
+    concentrationState = 'red';
+  } else if (top1Pct >= 30) {
+    concentrationState = 'yellow';
+  }
+  riskContainer.appendChild(
+    labeledValue(
+      'Top 1 Concentration',
+      `${top1Pct.toFixed(2)}%`,
+      statusClassForState(concentrationState)
+    )
+  );
+}
+
+function handleAccountReadiness(payload) {
+  const statusContainer = document.getElementById('account-readiness-status');
+  const reasonContainer = document.getElementById('account-readiness-reason');
+  statusContainer.innerHTML = '';
+  reasonContainer.innerHTML = '';
+
+  const evaluation = evaluateReadiness(payload);
+  statusContainer.appendChild(
+    labeledValue(
+      'Status',
+      evaluation.label,
+      statusClassForState(evaluation.state)
+    )
+  );
+  evaluation.details.forEach((detail) => {
+    reasonContainer.appendChild(labeledValue(detail.label, detail.value));
+  });
+}
+
+function normalizePositions(positionsPayload) {
+  if (!positionsPayload) return [];
+
+  const source = Array.isArray(positionsPayload)
+    ? positionsPayload
+    : positionsPayload.positions || positionsPayload.items || [];
+
+  if (!Array.isArray(source)) return [];
+
+  return source
+    .map((item) => {
+      const symbol = item.symbol || item.asset_symbol || item.ticker || item.code || 'UNKNOWN';
+      const marketValue =
+        Number.parseFloat(item.market_value) ||
+        Number.parseFloat(item.marketValue) ||
+        Number.parseFloat(item.value) ||
+        0;
+      return { symbol, marketValue };
+    })
+    .filter((item) => item.marketValue > 0);
+}
+
+function evaluateReadiness(payload) {
+  const suspensionSummary = summarizeSuspensionStatuses(payload?.suspensionStatuses);
+  if (suspensionSummary.hasBlockingSuspension) {
+    return {
+      state: 'red',
+      label: 'Restricted',
+      details: [
+        { label: 'Suspension', value: suspensionSummary.summaryText },
+      ],
+    };
+  }
+
+  const fundingSummary = summarizeFundingEligibilities(payload?.fundingEligibilities);
+  const eligibilitySummary = summarizeProductEligibilities(payload?.eligibilities);
+
+  const details = [
+    { label: 'Suspension', value: suspensionSummary.summaryText },
+    { label: 'Funding (Egypt)', value: fundingSummary.summaryText },
+    { label: 'Products', value: eligibilitySummary.summaryText },
+  ];
+
+  if (fundingSummary.hasBlockingIssue) {
+    return {
+      state: 'yellow',
+      label: 'Action Needed',
+      details,
+    };
+  }
+
+  if (eligibilitySummary.hasActionNeeded) {
+    return {
+      state: 'yellow',
+      label: 'Review Required',
+      details,
+    };
+  }
+
+  return {
+    state: 'green',
+    label: 'Ready',
+    details,
+  };
+}
+
+function summarizeSuspensionStatuses(suspensionStatuses) {
+  if (!suspensionStatuses || typeof suspensionStatuses !== 'object') {
+    return {
+      hasBlockingSuspension: false,
+      summaryText: 'No data',
+    };
+  }
+
+  const suspensionFlags = [
+    'buying_securities_suspended',
+    'selling_securities_suspended',
+    'withdraw_suspended',
+    'deposit_suspended',
+  ];
+
+  const activeFlags = suspensionFlags.filter((flag) => Boolean(suspensionStatuses[flag]));
+  if (!activeFlags.length) {
+    return {
+      hasBlockingSuspension: false,
+      summaryText: 'None',
+    };
+  }
+
+  const labels = activeFlags.map((flag) => flag.replace(/_suspended$/, '').replaceAll('_', ' '));
+  return {
+    hasBlockingSuspension: true,
+    summaryText: labels.join(', '),
+  };
+}
+
+function summarizeFundingEligibilities(fundingEligibilities) {
+  const source = fundingEligibilities?.eligibilities;
+  const list = Array.isArray(source) ? source : [];
+
+  if (!list.length) {
+    return {
+      hasBlockingIssue: false,
+      summaryText: 'No data',
+    };
+  }
+
+  const egypt = list.find((item) => String(item.market).toLowerCase() === 'egypt');
+  const target = egypt || list[0];
+  const canDeposit = Boolean(target.eligible_to_deposit);
+  const canWithdraw = Boolean(target.eligible_to_withdraw);
+
+  let summaryText = `${String(target.market || 'unknown')} `;
+  summaryText += `deposit ${canDeposit ? 'enabled' : 'disabled'}, `;
+  summaryText += `withdraw ${canWithdraw ? 'enabled' : 'disabled'}`;
+
+  const reasons = target.ineligibility_reason || {};
+  const reasonText = [reasons.deposit, reasons.withdraw].filter(Boolean).join(', ');
+  if (reasonText) {
+    summaryText += ` (${reasonText})`;
+  }
+
+  return {
+    hasBlockingIssue: !canDeposit || !canWithdraw,
+    summaryText,
+  };
+}
+
+function summarizeProductEligibilities(eligibilitiesResponse) {
+  const source = eligibilitiesResponse?.eligibilities;
+  const list = Array.isArray(source) ? source : [];
+
+  if (!list.length) {
+    return {
+      hasActionNeeded: false,
+      summaryText: 'No data',
+    };
+  }
+
+  const registeredEligible = list.filter(
+    (item) => item.eligibility_status === 'ELIGIBLE' && item.registration_status === 'REGISTERED'
+  ).length;
+
+  const pending = list.filter(
+    (item) => item.registration_status === 'PENDING' || item.registration_status === 'IN_REVIEW'
+  ).length;
+
+  const notAttempted = list.filter(
+    (item) => item.registration_status === 'NOT_ATTEMPTED' || item.eligibility_status === 'NOT_REGISTERED'
+  ).length;
+
+  let summaryText = `${registeredEligible} eligible & registered`;
+  if (pending > 0) {
+    summaryText += `, ${pending} pending`;
+  }
+  if (notAttempted > 0) {
+    summaryText += `, ${notAttempted} not started`;
+  }
+
+  return {
+    hasActionNeeded: registeredEligible === 0 || pending > 0,
+    summaryText,
+  };
+}
+
+function statusClassForState(state) {
+  if (state === 'green') return 'status-green';
+  if (state === 'red') return 'status-red';
+  return 'status-yellow';
 }

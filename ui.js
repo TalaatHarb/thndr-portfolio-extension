@@ -1,4 +1,4 @@
-function labeledValue(label, value) {
+function labeledValue(label, value, valueClassName = '') {
     const row = document.createElement('div');
     row.className = 'kv';
 
@@ -8,6 +8,9 @@ function labeledValue(label, value) {
 
     const valueSpan = document.createElement('span');
     valueSpan.className = 'kv-value';
+    if (valueClassName) {
+        valueSpan.classList.add(valueClassName);
+    }
     valueSpan.textContent = value;
 
     row.appendChild(labelSpan);

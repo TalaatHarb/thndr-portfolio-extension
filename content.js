@@ -17,7 +17,6 @@ async function updateData(token) {
       fetchPortfolioData(token),
       fetchPurchasePower(token),
       fetchCashInHolding(token),
-      fetchMarketHours(token),
       fetchPositions(token),
       fetchEligibilities(token),
       fetchFundingEligibilities(token),
