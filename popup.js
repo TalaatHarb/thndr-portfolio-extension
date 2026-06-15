@@ -230,37 +230,52 @@ function handleTopPositions(positionsPayload) {
   const positions = normalizePositions(positionsPayload);
 
   if (!positions.length) {
-    listContainer.appendChild(labeledValue('Positions', 'No data available.'));
-    riskContainer.appendChild(labeledValue('Concentration', 'No data available.'));
+    listContainer.appendChild(labeledValue('Top 3 Stocks', 'No data available.'));
+    riskContainer.appendChild(labeledValue('Top 3 Funds', 'No data available.'));
     return;
   }
 
   const totalValue = positions.reduce((sum, p) => sum + p.marketValue, 0);
+  const stocks = positions.filter((position) => position.positionKind === 'stock');
+  const funds = positions.filter((position) => position.positionKind === 'fund');
+
+  renderTopGroup(listContainer, 'Stocks', stocks, totalValue);
+  renderTopGroup(riskContainer, 'Funds', funds, totalValue);
+}
+
+function renderTopGroup(container, label, positions, totalValue) {
   const top3 = [...positions]
     .sort((a, b) => b.marketValue - a.marketValue)
     .slice(0, 3);
 
+  if (!top3.length) {
+    container.appendChild(labeledValue(`Top 3 ${label}`, 'No data available.'));
+    return;
+  }
+
+  container.appendChild(labeledValue(`Top 3 ${label}`, `${top3.length} shown`));
+
   top3.forEach((position, index) => {
     const pct = totalValue > 0 ? (position.marketValue * 100) / totalValue : 0;
-    listContainer.appendChild(
-      labeledValue(`#${index + 1} ${position.symbol}`, `${pct.toFixed(2)}%`)
+    const gainLossPct = normalizeGainLossPercentage(position.gainLossPercentage);
+    const signedGainLoss = formatSignedNumber(position.gainLoss);
+    const signedGainLossPct = `${gainLossPct >= 0 ? '+' : ''}${gainLossPct.toFixed(2)}%`;
+
+    let gainLossClassName = '';
+    if (position.gainLoss > 0) {
+      gainLossClassName = statusClassForState('green');
+    } else if (position.gainLoss < 0) {
+      gainLossClassName = statusClassForState('red');
+    }
+
+    container.appendChild(
+      labeledValue(
+        `#${index + 1} ${position.symbol} (${pct.toFixed(2)}%)`,
+        `${signedGainLoss} (${signedGainLossPct})`,
+        gainLossClassName
+      )
     );
   });
-
-  const top1Pct = totalValue > 0 ? (top3[0].marketValue * 100) / totalValue : 0;
-  let concentrationState = 'green';
-  if (top1Pct >= 50) {
-    concentrationState = 'red';
-  } else if (top1Pct >= 30) {
-    concentrationState = 'yellow';
-  }
-  riskContainer.appendChild(
-    labeledValue(
-      'Top 1 Concentration',
-      `${top1Pct.toFixed(2)}%`,
-      statusClassForState(concentrationState)
-    )
-  );
 }
 
 function handleAccountReadiness(payload) {
@@ -299,9 +314,62 @@ function normalizePositions(positionsPayload) {
         Number.parseFloat(item.marketValue) ||
         Number.parseFloat(item.value) ||
         0;
-      return { symbol, marketValue };
+      const gainLoss =
+        Number.parseFloat(item.gain_loss) ||
+        Number.parseFloat(item.gainLoss) ||
+        0;
+      const gainLossPercentage =
+        Number.parseFloat(item.gain_loss_percentage) ||
+        Number.parseFloat(item.gainLossPercentage) ||
+        0;
+      const positionKind = classifyPositionKind(item);
+      return { symbol, marketValue, positionKind, gainLoss, gainLossPercentage };
     })
-    .filter((item) => item.marketValue > 0);
+    .filter((item) => item.marketValue > 0 && item.positionKind !== 'other');
+}
+
+function normalizeGainLossPercentage(rawValue) {
+  const numeric = Number.parseFloat(rawValue) || 0;
+  if (Math.abs(numeric) <= 1) {
+    return numeric * 100;
+  }
+  return numeric;
+}
+
+function formatSignedNumber(rawValue) {
+  const numeric = Number.parseFloat(rawValue) || 0;
+  const sign = numeric >= 0 ? '+' : '-';
+  return `${sign}${Math.abs(numeric).toFixed(2)}`;
+}
+
+function classifyPositionKind(item) {
+  const rawFields = [
+    item.asset_class,
+    item.assetClass,
+    item.instrument_type,
+    item.instrumentType,
+    item.security_type,
+    item.securityType,
+    item.product_name,
+    item.productName,
+    item.category,
+    item.type,
+    item.name,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value).toLowerCase());
+
+  const text = rawFields.join(' ');
+
+  if (/fund|mutual|etf/.test(text)) {
+    return 'fund';
+  }
+
+  if (/stock|equity|share|common|preferred/.test(text)) {
+    return 'stock';
+  }
+
+  return 'stock';
 }
 
 function evaluateReadiness(payload) {
