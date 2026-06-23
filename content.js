@@ -12,12 +12,13 @@
 
 async function updateData(token) {
   try {
-    await Promise.all([
+    const [positionsPayload] = await Promise.all([
+      fetchPositions(token),
+
       // Original calls
       fetchPortfolioData(token),
       fetchPurchasePower(token),
       fetchCashInHolding(token),
-      fetchPositions(token),
       fetchEligibilities(token),
       fetchFundingEligibilities(token),
       fetchSuspensionStatuses(token),
@@ -49,6 +50,11 @@ async function updateData(token) {
       // fetchSubscribers(token),
       // fetchSubscriberPaymentMethod(token),
     ]);
+
+    const symbols = extractEgxSymbolsFromPositions(positionsPayload).slice(0, 3);
+    if (symbols.length > 0) {
+      await requestTradingViewInsights(symbols);
+    }
   } catch (err) {
     console.error('[Thndr Extension] Error updating data:', err);
   }
@@ -82,6 +88,51 @@ function sendStoreMessage(action, payloadKey, payload) {
     action,
     [payloadKey]: payload
   });
+}
+
+function requestTradingViewInsights(symbols) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      {
+        action: 'fetchTradingViewInsights',
+        symbols,
+      },
+      () => {
+        if (chrome.runtime.lastError) {
+          console.warn('[Thndr Extension] TradingView insight request failed:', chrome.runtime.lastError.message);
+        }
+        resolve();
+      }
+    );
+  });
+}
+
+function extractEgxSymbolsFromPositions(positionsPayload) {
+  if (!positionsPayload) return [];
+
+  const source = Array.isArray(positionsPayload)
+    ? positionsPayload
+    : positionsPayload.positions || positionsPayload.items || [];
+
+  if (!Array.isArray(source)) return [];
+
+  const symbols = new Set();
+
+  for (const item of source) {
+    const rawSymbol = String(
+      item.symbol || item.asset_symbol || item.ticker || item.code || ''
+    ).trim().toUpperCase();
+
+    if (!rawSymbol) continue;
+    if (!rawSymbol.startsWith('EGX:')) {
+      symbols.add(`EGX:${rawSymbol}`);
+      continue;
+    }
+
+    symbols.add(rawSymbol);
+  }
+
+  return [...symbols];
 }
 
 
@@ -224,8 +275,11 @@ async function fetchPositions(token) {
       'positions',
       data
     );
+
+    return data;
   } catch (err) {
     console.error(err);
+    return null;
   }
 }
 

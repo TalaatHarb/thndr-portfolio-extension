@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
       'eligibilities',
       'fundingEligibilities',
       'suspensionStatuses',
+      'tradingViewInsights',
+      'tradingViewBestSignal',
+      'tradingViewLastSync',
     ],
     (result) => {
       // Calculate total money
@@ -29,6 +32,11 @@ document.addEventListener('DOMContentLoaded', () => {
         eligibilities: result.eligibilities,
         fundingEligibilities: result.fundingEligibilities,
         suspensionStatuses: result.suspensionStatuses,
+      });
+      handleTechnicalSignal({
+        insights: result.tradingViewInsights,
+        bestSignal: result.tradingViewBestSignal,
+        lastSync: result.tradingViewLastSync,
       });
 
       // You could now pass this to a new visualization handler
@@ -107,6 +115,23 @@ document.addEventListener('DOMContentLoaded', () => {
               eligibilities: result.eligibilities,
               fundingEligibilities: result.fundingEligibilities,
               suspensionStatuses: result.suspensionStatuses,
+            });
+          }
+        );
+      }
+
+      if (
+        changes.tradingViewInsights ||
+        changes.tradingViewBestSignal ||
+        changes.tradingViewLastSync
+      ) {
+        chrome.storage.local.get(
+          ['tradingViewInsights', 'tradingViewBestSignal', 'tradingViewLastSync'],
+          (result) => {
+            handleTechnicalSignal({
+              insights: result.tradingViewInsights,
+              bestSignal: result.tradingViewBestSignal,
+              lastSync: result.tradingViewLastSync,
             });
           }
         );
@@ -519,4 +544,85 @@ function statusClassForState(state) {
   if (state === 'green') return 'status-green';
   if (state === 'red') return 'status-red';
   return 'status-yellow';
+}
+
+function handleTechnicalSignal(payload) {
+  const container = document.getElementById('technical-signal');
+  container.innerHTML = '';
+
+  const bestSignal = payload?.bestSignal;
+  const insights = Array.isArray(payload?.insights) ? payload.insights : [];
+
+  if (!bestSignal && insights.length === 0) {
+    container.appendChild(labeledValue('Signal', 'No data available.'));
+    return;
+  }
+
+  const selected = bestSignal || insights[0];
+  const recommendation = Number.parseFloat(selected.recommendation);
+  const decisionLabel = selected?.decision?.label || recommendationLabelFromScore(recommendation);
+  const decisionState = selected?.decision?.state || recommendationStateFromScore(recommendation);
+
+  container.appendChild(
+    labeledValue(
+      `${selected.symbol} (${formatIntervalLabel('5')})`,
+      decisionLabel,
+      statusClassForState(decisionState)
+    )
+  );
+
+  if (!Number.isNaN(recommendation)) {
+    container.appendChild(labeledValue('Recommendation Score', recommendation.toFixed(3)));
+    container.appendChild(labeledValue('Confidence', scoreConfidence(Math.abs(recommendation))));
+  }
+
+  const close = Number.parseFloat(selected.close);
+  if (!Number.isNaN(close)) {
+    container.appendChild(labeledValue('Last Price', close.toFixed(2)));
+  }
+
+  const rsi = Number.parseFloat(selected.rsi);
+  if (!Number.isNaN(rsi)) {
+    container.appendChild(labeledValue('RSI', rsi.toFixed(2)));
+  }
+
+  const lastSync = payload?.lastSync || selected?.fetchedAt;
+  if (lastSync) {
+    const date = new Date(lastSync);
+    if (!Number.isNaN(date.getTime())) {
+      container.appendChild(labeledValue('Updated', date.toLocaleTimeString()));
+    }
+  }
+
+  if (insights.length > 1) {
+    container.appendChild(labeledValue('Symbols Scanned', `${insights.length}`));
+  }
+}
+
+function recommendationLabelFromScore(score) {
+  if (typeof score !== 'number' || Number.isNaN(score)) return 'No signal';
+  if (score >= 0.35) return 'Buy';
+  if (score >= 0.1) return 'Weak Buy';
+  if (score <= -0.35) return 'Sell';
+  if (score <= -0.1) return 'Weak Sell';
+  return 'Hold';
+}
+
+function recommendationStateFromScore(score) {
+  if (typeof score !== 'number' || Number.isNaN(score)) return 'yellow';
+  if (score >= 0.1) return 'green';
+  if (score <= -0.1) return 'red';
+  return 'yellow';
+}
+
+function scoreConfidence(absScore) {
+  if (absScore >= 0.7) return 'Very High';
+  if (absScore >= 0.45) return 'High';
+  if (absScore >= 0.25) return 'Medium';
+  return 'Low';
+}
+
+function formatIntervalLabel(interval) {
+  if (interval === '5') return '5m';
+  return interval;
 }

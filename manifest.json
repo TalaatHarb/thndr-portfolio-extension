@@ -28,5 +28,8 @@
     "storage",
     "activeTab",
     "scripting"
+  ],
+  "host_permissions": [
+    "https://scanner.tradingview.com/*"
   ]
 }
