@@ -160,7 +160,7 @@ async function fetchCashInHolding(token) {
       '/market-service/accounts/cash-in-holding?market=egypt'
     );
 
-    if (!data) return;
+    if (data == null) return;
 
     sendStoreMessage(
       'storeCachInHolding',

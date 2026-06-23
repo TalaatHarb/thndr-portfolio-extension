@@ -197,7 +197,7 @@ function handlePurchasePower(result) {
 
 function handleCashInHolding(result) {
   const cachInHolding = Number.parseFloat(result.cachInHolding) || 0;
-  if (!result?.cachInHolding) {
+  if (result?.cachInHolding == null) {
     document.getElementById('cach-in-holding').innerText = 'No data available.';
     return;
   }
